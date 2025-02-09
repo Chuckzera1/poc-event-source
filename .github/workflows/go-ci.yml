@@ -1,12 +1,10 @@
 on:
   push:
     branches:
-      - main
-      - develop
+      - master
   pull_request:
     branches:
-      - main
-      - develop
+      - master
 
 jobs:
   test:
