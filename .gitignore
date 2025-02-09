@@ -1,0 +1,10 @@
+.idea/
+*.iml
+*.iws
+*.ipr
+*.ids
+*.orig
+*.test
+.env
+go.work
+go.work.sum
