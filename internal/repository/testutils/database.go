@@ -47,6 +47,11 @@ func NewTestDatabase(ctx context.Context, model ...interface{}) (*TestDatabase, 
 		return nil, fmt.Errorf("failed to connect with GORM: %w", err)
 	}
 
+	err = gormDB.Exec("CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";").Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to create uuid-ossp extension: %v", err)
+	}
+
 	if len(model) > 0 {
 		if err := autoMigratemodel(gormDB, model); err != nil {
 			err := container.Terminate(ctx)
