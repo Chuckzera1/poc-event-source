@@ -33,6 +33,14 @@ services:
       timeout: 5s
       retries: 5
 
+  nats:
+    image: nats:latest
+    command: [ "-js" ]        # enable JetStream
+    ports:
+      - "4222:4222"         # NATS client connections
+      - "8222:8222"         # Monitoring UI
+    restart: unless-stopped
+
 networks:
   app-network:
 
