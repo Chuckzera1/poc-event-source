@@ -44,14 +44,6 @@ func (m *mockUserRepo) CreateUser(u *model.User) (*model.User, error) {
 	return m.createFn(u)
 }
 
-type mockPwdUtil struct {
-	hashFn func(password string) (string, error)
-}
-
-func (m *mockPwdUtil) HashPassword(password string) (string, error) {
-	return m.hashFn(password)
-}
-
 // --- helpers ---
 
 func buildMessage(t *testing.T, eventType string, payload interface{}) (*application.Message, *bool) {
@@ -79,28 +71,20 @@ func TestUserBroker_Subscribe_handleCreate(t *testing.T) {
 		name       string
 		eventType  string
 		payload    dto.CreateUserReqDTO
-		hashErr    error
 		wantCreate bool
 		wantAck    bool
 	}{
 		{
 			name:       "creates user successfully",
 			eventType:  string(domain.CreateUser),
-			payload:    dto.CreateUserReqDTO{Username: "alice", Password: "secret"},
+			payload:    dto.CreateUserReqDTO{Username: "alice", Password: "$2a$10$hashedpwd"},
 			wantCreate: true,
 			wantAck:    true,
 		},
 		{
 			name:      "unknown event type — ack only, no user created",
 			eventType: "UNKNOWN_EVENT",
-			payload:   dto.CreateUserReqDTO{Username: "alice", Password: "secret"},
-			wantAck:   true,
-		},
-		{
-			name:      "hash error — user not created",
-			eventType: string(domain.CreateUser),
-			payload:   dto.CreateUserReqDTO{Username: "alice", Password: "secret"},
-			hashErr:   errors.New("hash error"),
+			payload:   dto.CreateUserReqDTO{Username: "alice", Password: "$2a$10$hashedpwd"},
 			wantAck:   true,
 		},
 	}
@@ -117,23 +101,13 @@ func TestUserBroker_Subscribe_handleCreate(t *testing.T) {
 					created = true
 					if tt.wantCreate {
 						assert.Equal(t, tt.payload.Username, u.Username)
-						assert.Equal(t, "hashed", u.Password)
+						assert.Equal(t, tt.payload.Password, u.Password)
 					}
 					return u, nil
 				},
 			}
 
-			hashErr := tt.hashErr
-			pwdUtil := &mockPwdUtil{
-				hashFn: func(_ string) (string, error) {
-					if hashErr != nil {
-						return "", hashErr
-					}
-					return "hashed", nil
-				},
-			}
-
-			userBroker := messaging.NewUserBroker(broker, repo, pwdUtil)
+			userBroker := messaging.NewUserBroker(broker, repo)
 			err := userBroker.Subscribe()
 
 			assert.NoError(t, err)
@@ -144,7 +118,7 @@ func TestUserBroker_Subscribe_handleCreate(t *testing.T) {
 }
 
 func TestUserBroker_Subscribe_handleCreate_dbError_noAck(t *testing.T) {
-	msg, acked := buildMessage(t, string(domain.CreateUser), dto.CreateUserReqDTO{Username: "alice", Password: "secret"})
+	msg, acked := buildMessage(t, string(domain.CreateUser), dto.CreateUserReqDTO{Username: "alice", Password: "$2a$10$hashedpwd"})
 
 	broker := &syncBroker{msg: msg}
 	repo := &mockUserRepo{
@@ -152,9 +126,8 @@ func TestUserBroker_Subscribe_handleCreate_dbError_noAck(t *testing.T) {
 			return nil, errors.New("db error")
 		},
 	}
-	pwdUtil := &mockPwdUtil{hashFn: func(_ string) (string, error) { return "hashed", nil }}
 
-	userBroker := messaging.NewUserBroker(broker, repo, pwdUtil)
+	userBroker := messaging.NewUserBroker(broker, repo)
 	err := userBroker.Subscribe()
 
 	assert.NoError(t, err)
@@ -176,9 +149,8 @@ func TestUserBroker_Subscribe_invalidJSON(t *testing.T) {
 			return nil, nil
 		},
 	}
-	pwdUtil := &mockPwdUtil{hashFn: func(_ string) (string, error) { return "h", nil }}
 
-	userBroker := messaging.NewUserBroker(broker, repo, pwdUtil)
+	userBroker := messaging.NewUserBroker(broker, repo)
 	err := userBroker.Subscribe()
 
 	assert.NoError(t, err)

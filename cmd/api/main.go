@@ -61,12 +61,12 @@ func main() {
 	eventHandler := usecaseevent.NewMainHandler(eventRepo, broker)
 	createUserUC := usecaseuser.NewCreateUserUseCase(eventHandler)
 
-	userBroker := apimessaging.NewUserBroker(broker, userRepo, pwdUtil)
+	userBroker := apimessaging.NewUserBroker(broker, userRepo)
 	if err := userBroker.Subscribe(); err != nil {
 		log.Fatalf("Error starting user subscriber: %v", err)
 	}
 
-	userHandler := routes.NewUserHandler(createUserUC)
+	userHandler := routes.NewUserHandler(createUserUC, pwdUtil)
 	if err := api.StartAPI(cfg, userHandler.SetupUserRouter); err != nil {
 		log.Fatalf("Error starting api: %v", err)
 	}

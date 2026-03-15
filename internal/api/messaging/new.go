@@ -12,19 +12,16 @@ import (
 type UserBroker struct {
 	broker   application.Broker
 	userRepo irepository.UserRepository
-	pwdUtil  application.PasswordUtil
 	handlers map[string]func(context.Context, *application.Message)
 }
 
 func NewUserBroker(
 	broker application.Broker,
 	userRepo irepository.UserRepository,
-	pwdUtil application.PasswordUtil,
 ) api.Subscriber {
 	ub := &UserBroker{
 		broker:   broker,
 		userRepo: userRepo,
-		pwdUtil:  pwdUtil,
 	}
 	ub.handlers = map[string]func(context.Context, *application.Message){
 		string(domain.CreateUser): ub.handleCreate,

@@ -55,16 +55,7 @@ func (ub *UserBroker) handleCreate(ctx context.Context, msg *application.Message
 		return
 	}
 
-	hashed, err := ub.pwdUtil.HashPassword(input.Password)
-	if err != nil {
-		log.Printf("handleCreate: error hashing password: %v", err)
-		if err := msg.Ack(); err != nil {
-			log.Printf("handleCreate: ack failed: %v", err)
-		}
-		return
-	}
-
-	if _, err = ub.userRepo.CreateUser(&model.User{Username: input.Username, Password: hashed}); err != nil {
+	if _, err := ub.userRepo.CreateUser(&model.User{Username: input.Username, Password: input.Password}); err != nil {
 		log.Printf("handleCreate: error creating user: %v", err)
 		return
 	}
