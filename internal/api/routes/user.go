@@ -33,5 +33,5 @@ func (h *UserHandler) create(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"status": "event published"})
+	c.JSON(http.StatusAccepted, gin.H{"status": "event published"})
 }

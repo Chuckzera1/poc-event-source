@@ -1,9 +1,9 @@
 package irepository
 
-import "poc-event-source/internal/infrastructure/model"
+import "poc-event-source/internal/domain"
 
 type CreateEventRepository interface {
-	CreateEvent(event *model.EventSource) (*model.EventSource, error)
+	CreateEvent(event *domain.EventSource) (*domain.EventSource, error)
 }
 
 type EventRepository interface {

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"poc-event-source/internal/api/messaging"
 	"poc-event-source/internal/application"
 	"poc-event-source/internal/application/dto"
@@ -25,8 +26,8 @@ type syncBroker struct {
 	msg *application.Message
 }
 
-func (b *syncBroker) Subscribe(_ context.Context, _ string, handler func(context.Context, *application.Message)) (application.Subscription, error) {
-	handler(context.Background(), b.msg)
+func (b *syncBroker) Subscribe(ctx context.Context, _ string, handler func(context.Context, *application.Message)) (application.Subscription, error) {
+	handler(ctx, b.msg)
 	return &mockSubscription{}, nil
 }
 func (b *syncBroker) Publish(_ context.Context, _ string, _ []byte) error { return nil }
@@ -53,12 +54,15 @@ func (m *mockPwdUtil) HashPassword(password string) (string, error) {
 
 // --- helpers ---
 
-func buildMessage(eventType string, payload interface{}) (*application.Message, *bool) {
-	payloadBytes, _ := json.Marshal(payload)
-	envelope, _ := json.Marshal(dto.EventMessage{
+func buildMessage(t *testing.T, eventType string, payload interface{}) (*application.Message, *bool) {
+	t.Helper()
+	payloadBytes, err := json.Marshal(payload)
+	require.NoError(t, err)
+	envelope, err := json.Marshal(dto.EventMessage{
 		Type:    eventType,
 		Payload: payloadBytes,
 	})
+	require.NoError(t, err)
 	acked := false
 	msg := &application.Message{
 		Topic: "user",
@@ -77,32 +81,34 @@ func TestUserBroker_Subscribe_handleCreate(t *testing.T) {
 		payload    dto.CreateUserReqDTO
 		hashErr    error
 		wantCreate bool
+		wantAck    bool
 	}{
 		{
 			name:       "creates user successfully",
 			eventType:  string(domain.CreateUser),
 			payload:    dto.CreateUserReqDTO{Username: "alice", Password: "secret"},
 			wantCreate: true,
+			wantAck:    true,
 		},
 		{
-			name:       "unknown event type — ack only, no user created",
-			eventType:  "UNKNOWN_EVENT",
-			payload:    dto.CreateUserReqDTO{Username: "alice", Password: "secret"},
-			wantCreate: false,
+			name:      "unknown event type — ack only, no user created",
+			eventType: "UNKNOWN_EVENT",
+			payload:   dto.CreateUserReqDTO{Username: "alice", Password: "secret"},
+			wantAck:   true,
 		},
 		{
-			name:       "hash error — user not created",
-			eventType:  string(domain.CreateUser),
-			payload:    dto.CreateUserReqDTO{Username: "alice", Password: "secret"},
-			hashErr:    errors.New("hash error"),
-			wantCreate: false,
+			name:      "hash error — user not created",
+			eventType: string(domain.CreateUser),
+			payload:   dto.CreateUserReqDTO{Username: "alice", Password: "secret"},
+			hashErr:   errors.New("hash error"),
+			wantAck:   true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			created := false
-			msg, acked := buildMessage(tt.eventType, tt.payload)
+			msg, acked := buildMessage(t, tt.eventType, tt.payload)
 
 			broker := &syncBroker{msg: msg}
 
@@ -131,10 +137,28 @@ func TestUserBroker_Subscribe_handleCreate(t *testing.T) {
 			err := userBroker.Subscribe()
 
 			assert.NoError(t, err)
-			assert.True(t, *acked, "msg.Ack() must always be called")
+			assert.Equal(t, tt.wantAck, *acked)
 			assert.Equal(t, tt.wantCreate, created)
 		})
 	}
+}
+
+func TestUserBroker_Subscribe_handleCreate_dbError_noAck(t *testing.T) {
+	msg, acked := buildMessage(t, string(domain.CreateUser), dto.CreateUserReqDTO{Username: "alice", Password: "secret"})
+
+	broker := &syncBroker{msg: msg}
+	repo := &mockUserRepo{
+		createFn: func(_ *model.User) (*model.User, error) {
+			return nil, errors.New("db error")
+		},
+	}
+	pwdUtil := &mockPwdUtil{hashFn: func(_ string) (string, error) { return "hashed", nil }}
+
+	userBroker := messaging.NewUserBroker(broker, repo, pwdUtil)
+	err := userBroker.Subscribe()
+
+	assert.NoError(t, err)
+	assert.False(t, *acked, "msg.Ack() must NOT be called when CreateUser fails")
 }
 
 func TestUserBroker_Subscribe_invalidJSON(t *testing.T) {

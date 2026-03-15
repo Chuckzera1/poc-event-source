@@ -56,6 +56,7 @@ func (ub *UserBroker) handleCreate(ctx context.Context, msg *application.Message
 
 	if _, err = ub.userRepo.CreateUser(&model.User{Username: input.Username, Password: hashed}); err != nil {
 		log.Printf("handleCreate: error creating user: %v", err)
+		return
 	}
 
 	msg.Ack()

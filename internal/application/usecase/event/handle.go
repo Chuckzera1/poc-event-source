@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 
 	"poc-event-source/internal/application/dto"
-	"poc-event-source/internal/infrastructure/model"
+	"poc-event-source/internal/domain"
 )
 
 func (m *mainHandlerUseCase) Handler(ctx context.Context, topic string, event dto.EventReqDTO) error {
-	_, err := m.createEventRepo.CreateEvent(&model.EventSource{
+	_, err := m.createEventRepo.CreateEvent(&domain.EventSource{
 		Type:    event.Type,
 		Payload: event.Payload,
 	})

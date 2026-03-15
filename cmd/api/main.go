@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"time"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/joho/godotenv"
 	"golang.org/x/crypto/bcrypt"
@@ -22,7 +24,7 @@ import (
 
 func init() {
 	if err := godotenv.Load(".env"); err != nil {
-		log.Fatalf("error loading .env file: %v", err)
+		log.Printf("warning: .env file not found: %v", err)
 	}
 }
 
@@ -45,7 +47,8 @@ func main() {
 		log.Fatalf("Error connecting to projection db: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 168*time.Hour)
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
 	broker, err := infrastructure.Nats(cfg.BrokerURL, cfg.BrokerStreamName, cfg.BrokerSubjects, ctx, cancel)
 	if err != nil {
 		log.Fatalf("Error connecting to events broker: %v", err)
