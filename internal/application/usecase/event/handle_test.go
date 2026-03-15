@@ -11,16 +11,15 @@ import (
 	"poc-event-source/internal/application/dto"
 	"poc-event-source/internal/application/usecase/event"
 	"poc-event-source/internal/domain"
-	"poc-event-source/internal/infrastructure/model"
 )
 
 // --- mocks ---
 
 type mockEventRepo struct {
-	createFn func(e *model.EventSource) (*model.EventSource, error)
+	createFn func(e *domain.EventSource) (*domain.EventSource, error)
 }
 
-func (m *mockEventRepo) CreateEvent(e *model.EventSource) (*model.EventSource, error) {
+func (m *mockEventRepo) CreateEvent(e *domain.EventSource) (*domain.EventSource, error) {
 	return m.createFn(e)
 }
 
@@ -75,7 +74,7 @@ func TestMainHandlerUseCase_Handler(t *testing.T) {
 			publishCalled := false
 
 			repo := &mockEventRepo{
-				createFn: func(e *model.EventSource) (*model.EventSource, error) {
+				createFn: func(e *domain.EventSource) (*domain.EventSource, error) {
 					return e, tt.repoErr
 				},
 			}

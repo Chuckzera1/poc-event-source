@@ -2,13 +2,15 @@ package event_test
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"poc-event-source/internal/domain"
 	"poc-event-source/internal/infrastructure/model"
 	"poc-event-source/internal/repository/event"
 	"poc-event-source/internal/repository/testutils"
-	"testing"
-	"time"
 )
 
 func TestEventRepository_CreateEvent(t *testing.T) {
@@ -22,13 +24,13 @@ func TestEventRepository_CreateEvent(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		event       *model.EventSource
+		event       *domain.EventSource
 		wantErr     bool
 		errContains string
 	}{
 		{
 			name: "successfully create event with all fields",
-			event: &model.EventSource{
+			event: &domain.EventSource{
 				AggregateID: uuid.NewString(),
 				Type:        "UserCreated",
 				Payload:     []byte(`{"name": "John"}`),
@@ -37,7 +39,7 @@ func TestEventRepository_CreateEvent(t *testing.T) {
 		},
 		{
 			name: "successfully create event with minimum required fields",
-			event: &model.EventSource{
+			event: &domain.EventSource{
 				AggregateID: uuid.NewString(),
 				Type:        "UserUpdated",
 				Payload:     []byte(`{}`),
@@ -46,7 +48,7 @@ func TestEventRepository_CreateEvent(t *testing.T) {
 		},
 		{
 			name: "fail when missing event type",
-			event: &model.EventSource{
+			event: &domain.EventSource{
 				AggregateID: uuid.NewString(),
 				Payload:     []byte(`{"name": "John"}`),
 			},
@@ -55,7 +57,7 @@ func TestEventRepository_CreateEvent(t *testing.T) {
 		},
 		{
 			name: "fail when missing payload",
-			event: &model.EventSource{
+			event: &domain.EventSource{
 				AggregateID: uuid.NewString(),
 				Type:        "UserDeleted",
 			},
