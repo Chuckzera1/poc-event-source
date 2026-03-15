@@ -1,0 +1,78 @@
+language: "en-US"
+
+reviews:
+  profile: assertive
+  high_level_summary: true
+  auto_review:
+    enabled: true
+    drafts: false
+
+  instructions: |
+    This project is an Event Sourcing API in Go following Clean/Hexagonal Architecture.
+
+    ## Architecture Rules (mandatory)
+    - Import direction must be: domain ← application ← infrastructure/repository ← api
+    - `domain/` must not import any other internal package
+    - `application/` must not import `infrastructure/` directly
+    - `infrastructure/` and `repository/` must not contain business logic
+    - `api/` must not make direct database calls — always through a use case or repository interface
+
+    ## Event Sourcing
+    - HTTP handlers must not write to the projection table (`User`) directly
+    - The `EventSource` table is the write model (event log)
+    - The `User` table is the read model (projection), populated by the NATS subscriber
+    - Every event must be saved to EventSource before being published to the broker
+
+    ## Code Conventions
+    - Every exported struct must have a `New*()` constructor in a `new.go` file
+    - Interfaces must be defined in `application/` before their concrete implementations
+    - `context.Context` is required as the first parameter in any method touching the DB or broker
+    - Return `error`, never use `panic`
+    - One file per responsibility: `create.go`, `handle.go`, `find.go`, etc.
+
+    ## Testing
+    - Repository integration tests must use testcontainers (see `internal/repository/testutils/`)
+    - Never mock the database in integration tests
+    - Use case tests are unit tests with simple interface mocks
+
+  path_instructions:
+    - path: "internal/domain/**"
+      instructions: |
+        Verify this file does not import any other internal project package.
+        Domain must be pure — only business structs, types, and constants.
+
+    - path: "internal/application/**"
+      instructions: |
+        Verify this file does not import `infrastructure/` directly (except via irepository which already uses model).
+        Interfaces must be defined here before any implementation.
+        Use cases must receive dependencies via constructor injection, never instantiate them directly.
+
+    - path: "internal/infrastructure/**"
+      instructions: |
+        Verify there is no business logic here — only adapters for external systems (NATS, GORM) to application interfaces.
+        Structs must implement interfaces defined in `application/`.
+
+    - path: "internal/repository/**"
+      instructions: |
+        Verify it implements an interface from `application/irepository/`.
+        DB operations should use `context.Context`.
+        Constructor in `new.go` must return the interface, not the concrete type.
+
+    - path: "internal/api/**"
+      instructions: |
+        Route handlers must not access the database directly.
+        Dependencies injected via constructor, never instantiated inside the handler.
+        Return appropriate HTTP status codes: 400 for input errors, 500 for internal errors, 201/202 for async creation.
+
+    - path: "**/*_test.go"
+      instructions: |
+        Repository tests must use testcontainers (NewTestDatabase from internal/repository/testutils/).
+        Use case tests must use interface mocks, not real infra instances.
+        Never use database mocks in repository tests.
+        Wrap operations in transactions with defer tx.Rollback() to keep the DB clean between tests.
+
+    - path: "cmd/api/main.go"
+      instructions: |
+        Verify all dependencies are properly instantiated and injected (wiring).
+        No business logic should exist here — bootstrap only.
+        Connection variables must not be discarded with _.
