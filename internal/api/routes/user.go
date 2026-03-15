@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -30,7 +31,8 @@ func (h *UserHandler) create(c *gin.Context) {
 		return
 	}
 	if err := h.createUser.Execute(c.Request.Context(), req); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("create user: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
 		return
 	}
 	c.JSON(http.StatusAccepted, gin.H{"status": "event published"})

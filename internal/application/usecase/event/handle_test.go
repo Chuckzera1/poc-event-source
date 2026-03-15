@@ -16,11 +16,11 @@ import (
 // --- mocks ---
 
 type mockEventRepo struct {
-	createFn func(e *domain.EventSource) (*domain.EventSource, error)
+	createFn func(ctx context.Context, e *domain.EventSource) (*domain.EventSource, error)
 }
 
-func (m *mockEventRepo) CreateEvent(e *domain.EventSource) (*domain.EventSource, error) {
-	return m.createFn(e)
+func (m *mockEventRepo) CreateEvent(ctx context.Context, e *domain.EventSource) (*domain.EventSource, error) {
+	return m.createFn(ctx, e)
 }
 
 type mockBroker struct {
@@ -74,7 +74,7 @@ func TestMainHandlerUseCase_Handler(t *testing.T) {
 			publishCalled := false
 
 			repo := &mockEventRepo{
-				createFn: func(e *domain.EventSource) (*domain.EventSource, error) {
+				createFn: func(_ context.Context, e *domain.EventSource) (*domain.EventSource, error) {
 					return e, tt.repoErr
 				},
 			}

@@ -9,7 +9,7 @@ import (
 )
 
 func (m *mainHandlerUseCase) Handler(ctx context.Context, topic string, event dto.EventReqDTO) error {
-	_, err := m.createEventRepo.CreateEvent(&domain.EventSource{
+	_, err := m.createEventRepo.CreateEvent(ctx, &domain.EventSource{
 		Type:    event.Type,
 		Payload: event.Payload,
 	})

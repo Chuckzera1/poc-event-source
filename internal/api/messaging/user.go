@@ -16,14 +16,18 @@ func (ub *UserBroker) Subscribe() error {
 		var envelope dto.EventMessage
 		if err := json.Unmarshal(msg.Data, &envelope); err != nil {
 			log.Printf("Subscribe: error unmarshaling message: %v", err)
-			msg.Ack()
+			if err := msg.Ack(); err != nil {
+				log.Printf("Subscribe: ack failed: %v", err)
+			}
 			return
 		}
 
 		handler, ok := ub.handlers[envelope.Type]
 		if !ok {
 			log.Printf("Subscribe: no handler for event type: %s", envelope.Type)
-			msg.Ack()
+			if err := msg.Ack(); err != nil {
+				log.Printf("Subscribe: ack failed: %v", err)
+			}
 			return
 		}
 
@@ -36,21 +40,27 @@ func (ub *UserBroker) handleCreate(ctx context.Context, msg *application.Message
 	var envelope dto.EventMessage
 	if err := json.Unmarshal(msg.Data, &envelope); err != nil {
 		log.Printf("handleCreate: error unmarshaling envelope: %v", err)
-		msg.Ack()
+		if err := msg.Ack(); err != nil {
+			log.Printf("handleCreate: ack failed: %v", err)
+		}
 		return
 	}
 
 	var input dto.CreateUserReqDTO
 	if err := json.Unmarshal(envelope.Payload, &input); err != nil {
 		log.Printf("handleCreate: error unmarshaling payload: %v", err)
-		msg.Ack()
+		if err := msg.Ack(); err != nil {
+			log.Printf("handleCreate: ack failed: %v", err)
+		}
 		return
 	}
 
 	hashed, err := ub.pwdUtil.HashPassword(input.Password)
 	if err != nil {
 		log.Printf("handleCreate: error hashing password: %v", err)
-		msg.Ack()
+		if err := msg.Ack(); err != nil {
+			log.Printf("handleCreate: ack failed: %v", err)
+		}
 		return
 	}
 
@@ -59,5 +69,7 @@ func (ub *UserBroker) handleCreate(ctx context.Context, msg *application.Message
 		return
 	}
 
-	msg.Ack()
+	if err := msg.Ack(); err != nil {
+		log.Printf("handleCreate: ack failed: %v", err)
+	}
 }

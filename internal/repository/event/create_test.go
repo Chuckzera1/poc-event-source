@@ -73,7 +73,7 @@ func TestEventRepository_CreateEvent(t *testing.T) {
 			repo := event.NewEventRepository(tx)
 			defer tx.Rollback()
 
-			createdEvent, err2 := repo.CreateEvent(tt.event)
+			createdEvent, err2 := repo.CreateEvent(ctx, tt.event)
 
 			if tt.wantErr {
 				assert.Error(t, err2)
@@ -102,7 +102,7 @@ func TestEventRepository_CreateEvent(t *testing.T) {
 			assert.WithinDuration(t, createdEvent.CreatedAt, dbEvent.CreatedAt, 5*time.Second)
 
 			if tt.name == "fail with duplicate ID" {
-				_, err := repo.CreateEvent(tt.event)
+				_, err := repo.CreateEvent(ctx, tt.event)
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), "duplicate key")
 			}
