@@ -3,13 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/joho/godotenv"
 	"log"
 	"poc-event-source/config"
 	"poc-event-source/internal/api"
 	"poc-event-source/internal/api/routes"
 	"poc-event-source/internal/infrastructure"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
 func init() {

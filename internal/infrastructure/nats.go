@@ -3,10 +3,11 @@ package infrastructure
 import (
 	"context"
 	"fmt"
-	"github.com/nats-io/nats.go"
-	"github.com/nats-io/nats.go/jetstream"
 	"log"
 	"poc-event-source/internal/application"
+
+	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 )
 
 type NatsBroker struct {
