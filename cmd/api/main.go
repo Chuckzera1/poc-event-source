@@ -4,26 +4,32 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"poc-event-source/config"
-	"poc-event-source/internal/api"
-	"poc-event-source/internal/api/routes"
-	"poc-event-source/internal/infrastructure"
 	"time"
 
 	"github.com/joho/godotenv"
+	"golang.org/x/crypto/bcrypt"
+	"poc-event-source/config"
+	"poc-event-source/internal/api"
+	apimessaging "poc-event-source/internal/api/messaging"
+	"poc-event-source/internal/api/routes"
+	usecaseevent "poc-event-source/internal/application/usecase/event"
+	usecaseuser "poc-event-source/internal/application/usecase/user"
+	"poc-event-source/internal/application/utils"
+	"poc-event-source/internal/infrastructure"
+	eventrepo "poc-event-source/internal/repository/event"
+	userrepo "poc-event-source/internal/repository/user"
 )
 
 func init() {
 	if err := godotenv.Load(".env"); err != nil {
-		log.Fatalf("erro ao carregar o arquivo .env: %v", err)
+		log.Fatalf("error loading .env file: %v", err)
 	}
 }
 
 func main() {
 	cfg := config.Load()
 
-	fmt.Println("Pass -> ", cfg.DatabasePassword)
-	_, err := infrastructure.NewGormDB(fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+	eventsDB, err := infrastructure.NewGormDB(fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		cfg.DatabaseHost,
 		cfg.DatabasePort,
 		cfg.DatabaseUser,
@@ -34,19 +40,31 @@ func main() {
 		log.Fatalf("Error connecting to events db: %v", err)
 	}
 
-	_, err = infrastructure.NewGormDB(cfg.ProjectionDBURL)
+	projectionDB, err := infrastructure.NewGormDB(cfg.ProjectionDBURL)
 	if err != nil {
-		log.Printf("Error connecting to projection db: %v", err)
+		log.Fatalf("Error connecting to projection db: %v", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 168*time.Hour)
-	_, err = infrastructure.Nats(cfg.BrokerURL, cfg.BrokerStreamName, cfg.BrokerSubjects, ctx, cancel)
+	broker, err := infrastructure.Nats(cfg.BrokerURL, cfg.BrokerStreamName, cfg.BrokerSubjects, ctx, cancel)
 	if err != nil {
 		log.Fatalf("Error connecting to events broker: %v", err)
 	}
 
-	err = api.StartAPI(cfg, routes.SetupUserRouter)
-	if err != nil {
+	eventRepo := eventrepo.NewEventRepository(eventsDB)
+	userRepo := userrepo.NewUserRepository(projectionDB)
+	pwdUtil := utils.NewPasswordUtils(bcrypt.DefaultCost)
+
+	eventHandler := usecaseevent.NewMainHandler(eventRepo, broker)
+	createUserUC := usecaseuser.NewCreateUserUseCase(eventHandler)
+
+	userBroker := apimessaging.NewUserBroker(broker, userRepo, pwdUtil)
+	if err := userBroker.Subscribe(); err != nil {
+		log.Fatalf("Error starting user subscriber: %v", err)
+	}
+
+	userHandler := routes.NewUserHandler(createUserUC)
+	if err := api.StartAPI(cfg, userHandler.SetupUserRouter); err != nil {
 		log.Fatalf("Error starting api: %v", err)
 	}
 }

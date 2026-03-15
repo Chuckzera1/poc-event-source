@@ -1,0 +1,162 @@
+package messaging_test
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"poc-event-source/internal/api/messaging"
+	"poc-event-source/internal/application"
+	"poc-event-source/internal/application/dto"
+	"poc-event-source/internal/domain"
+	"poc-event-source/internal/infrastructure/model"
+)
+
+// --- mocks ---
+
+type mockSubscription struct{}
+
+func (m *mockSubscription) Unsubscribe() error { return nil }
+
+// syncBroker invokes the handler synchronously when Subscribe is called, simplifying tests
+type syncBroker struct {
+	msg *application.Message
+}
+
+func (b *syncBroker) Subscribe(_ context.Context, _ string, handler func(context.Context, *application.Message)) (application.Subscription, error) {
+	handler(context.Background(), b.msg)
+	return &mockSubscription{}, nil
+}
+func (b *syncBroker) Publish(_ context.Context, _ string, _ []byte) error { return nil }
+func (b *syncBroker) QueueSubscribe(_ context.Context, _, _ string, _ func(context.Context, *application.Message)) (application.Subscription, error) {
+	return nil, nil
+}
+func (b *syncBroker) Close() error { return nil }
+
+type mockUserRepo struct {
+	createFn func(u *model.User) (*model.User, error)
+}
+
+func (m *mockUserRepo) CreateUser(u *model.User) (*model.User, error) {
+	return m.createFn(u)
+}
+
+type mockPwdUtil struct {
+	hashFn func(password string) (string, error)
+}
+
+func (m *mockPwdUtil) HashPassword(password string) (string, error) {
+	return m.hashFn(password)
+}
+
+// --- helpers ---
+
+func buildMessage(eventType string, payload interface{}) (*application.Message, *bool) {
+	payloadBytes, _ := json.Marshal(payload)
+	envelope, _ := json.Marshal(dto.EventMessage{
+		Type:    eventType,
+		Payload: payloadBytes,
+	})
+	acked := false
+	msg := &application.Message{
+		Topic: "user",
+		Data:  envelope,
+		Ack:   func() error { acked = true; return nil },
+	}
+	return msg, &acked
+}
+
+// --- tests ---
+
+func TestUserBroker_Subscribe_handleCreate(t *testing.T) {
+	tests := []struct {
+		name       string
+		eventType  string
+		payload    dto.CreateUserReqDTO
+		hashErr    error
+		wantCreate bool
+	}{
+		{
+			name:       "creates user successfully",
+			eventType:  string(domain.CreateUser),
+			payload:    dto.CreateUserReqDTO{Username: "alice", Password: "secret"},
+			wantCreate: true,
+		},
+		{
+			name:       "unknown event type — ack only, no user created",
+			eventType:  "UNKNOWN_EVENT",
+			payload:    dto.CreateUserReqDTO{Username: "alice", Password: "secret"},
+			wantCreate: false,
+		},
+		{
+			name:       "hash error — user not created",
+			eventType:  string(domain.CreateUser),
+			payload:    dto.CreateUserReqDTO{Username: "alice", Password: "secret"},
+			hashErr:    errors.New("hash error"),
+			wantCreate: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			created := false
+			msg, acked := buildMessage(tt.eventType, tt.payload)
+
+			broker := &syncBroker{msg: msg}
+
+			repo := &mockUserRepo{
+				createFn: func(u *model.User) (*model.User, error) {
+					created = true
+					if tt.wantCreate {
+						assert.Equal(t, tt.payload.Username, u.Username)
+						assert.Equal(t, "hashed", u.Password)
+					}
+					return u, nil
+				},
+			}
+
+			hashErr := tt.hashErr
+			pwdUtil := &mockPwdUtil{
+				hashFn: func(_ string) (string, error) {
+					if hashErr != nil {
+						return "", hashErr
+					}
+					return "hashed", nil
+				},
+			}
+
+			userBroker := messaging.NewUserBroker(broker, repo, pwdUtil)
+			err := userBroker.Subscribe()
+
+			assert.NoError(t, err)
+			assert.True(t, *acked, "msg.Ack() must always be called")
+			assert.Equal(t, tt.wantCreate, created)
+		})
+	}
+}
+
+func TestUserBroker_Subscribe_invalidJSON(t *testing.T) {
+	acked := false
+	msg := &application.Message{
+		Topic: "user",
+		Data:  []byte("not-json"),
+		Ack:   func() error { acked = true; return nil },
+	}
+
+	broker := &syncBroker{msg: msg}
+	repo := &mockUserRepo{
+		createFn: func(_ *model.User) (*model.User, error) {
+			t.Fatal("CreateUser must not be called with invalid JSON")
+			return nil, nil
+		},
+	}
+	pwdUtil := &mockPwdUtil{hashFn: func(_ string) (string, error) { return "h", nil }}
+
+	userBroker := messaging.NewUserBroker(broker, repo, pwdUtil)
+	err := userBroker.Subscribe()
+
+	assert.NoError(t, err)
+	assert.True(t, acked, "msg.Ack() must be called even with invalid JSON")
+}
