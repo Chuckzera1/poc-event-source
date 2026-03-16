@@ -1,13 +1,23 @@
 package event
 
-import "poc-event-source/internal/infrastructure/model"
+import (
+	"context"
 
-func (e *eventRepository) CreateEvent(event *model.EventSource) (*model.EventSource, error) {
-	ev := event
-	err := e.db.Create(ev).Error
-	if err != nil {
+	"poc-event-source/internal/domain"
+	"poc-event-source/internal/infrastructure/model"
+)
+
+func (e *eventRepository) CreateEvent(ctx context.Context, event *domain.EventSource) (*domain.EventSource, error) {
+	ev := &model.EventSource{
+		AggregateID: event.AggregateID,
+		Type:        event.Type,
+		Payload:     event.Payload,
+	}
+	if err := e.db.WithContext(ctx).Create(ev).Error; err != nil {
 		return nil, err
 	}
-
-	return ev, err
+	event.ID = ev.ID
+	event.Version = ev.Version
+	event.CreatedAt = ev.CreatedAt
+	return event, nil
 }

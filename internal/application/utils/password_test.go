@@ -20,40 +20,40 @@ func TestHashPassword(t *testing.T) {
 		assertFunc func(t *testing.T, hash string, err error)
 	}{
 		{
-			name:     "senha válida deve gerar hash sem erros",
-			password: "SenhaF0rte!2023",
+			name:     "valid password should generate hash without errors",
+			password: "StrongP@ss!2023",
 			setup:    func() application.PasswordUtil { return defaultCostUtils },
 			assertFunc: func(t *testing.T, hash string, err error) {
-				assert.NoError(t, err, "Erro inesperado")
-				assert.NotEmpty(t, hash, "Hash gerado não pode ser vazio")
+				assert.NoError(t, err, "unexpected error")
+				assert.NotEmpty(t, hash, "generated hash must not be empty")
 
-				err = bcrypt.CompareHashAndPassword([]byte(hash), []byte("SenhaF0rte!2023"))
-				assert.NoError(t, err, "Hash não corresponde à senha")
+				err = bcrypt.CompareHashAndPassword([]byte(hash), []byte("StrongP@ss!2023"))
+				assert.NoError(t, err, "hash does not match password")
 			},
 		},
 		{
-			name:     "hashs diferentes para mesma senha",
-			password: "outraSenha123@",
+			name:     "different hashes for same password",
+			password: "anotherPassword123@",
 			setup:    func() application.PasswordUtil { return defaultCostUtils },
 			assertFunc: func(t *testing.T, hash string, err error) {
-				assert.NoError(t, err, "Erro inesperado")
+				assert.NoError(t, err, "unexpected error")
 
-				hash2, err := defaultCostUtils.HashPassword("outraSenha123@")
-				assert.NoError(t, err, "Erro inesperado ao gerar segundo hash")
-				assert.NotEqual(t, hash, hash2, "Hashs idênticos para a mesma senha - salting não está funcionando")
+				hash2, err := defaultCostUtils.HashPassword("anotherPassword123@")
+				assert.NoError(t, err, "unexpected error generating second hash")
+				assert.NotEqual(t, hash, hash2, "identical hashes for same password — salting is not working")
 			},
 		},
 		{
-			name:     "senha vazia deve ser tratada",
+			name:     "empty password should be handled",
 			password: "",
 			setup:    func() application.PasswordUtil { return defaultCostUtils },
 			assertFunc: func(t *testing.T, hash string, err error) {
-				assert.NoError(t, err, "Erro inesperado para senha vazia")
-				assert.GreaterOrEqual(t, utf8.RuneCountInString(hash), 60, "Hash inválido para senha vazia")
+				assert.NoError(t, err, "unexpected error for empty password")
+				assert.GreaterOrEqual(t, utf8.RuneCountInString(hash), 60, "invalid hash for empty password")
 			},
 		},
 		{
-			name:     "senha muito longa",
+			name:     "password too long",
 			password: string(make([]byte, 100)),
 			setup:    func() application.PasswordUtil { return defaultCostUtils },
 			assertFunc: func(t *testing.T, hash string, err error) {
@@ -62,13 +62,13 @@ func TestHashPassword(t *testing.T) {
 			},
 		},
 		{
-			name:     "caracteres especiais e unicode",
+			name:     "special characters and unicode",
 			password: "P@$$w0rd_áéíóú",
 			setup:    func() application.PasswordUtil { return defaultCostUtils },
 			assertFunc: func(t *testing.T, hash string, err error) {
-				assert.NoError(t, err, "Erro inesperado")
+				assert.NoError(t, err, "unexpected error")
 				err = bcrypt.CompareHashAndPassword([]byte(hash), []byte("P@$$w0rd_áéíóú"))
-				assert.NoError(t, err, "Hash não corresponde para caso de caracteres especiais")
+				assert.NoError(t, err, "hash does not match for special characters case")
 			},
 		},
 	}
@@ -81,10 +81,10 @@ func TestHashPassword(t *testing.T) {
 		})
 	}
 
-	t.Run("teste de estresse com múltiplas requisições", func(t *testing.T) {
+	t.Run("stress test with multiple requests", func(t *testing.T) {
 		for i := 0; i < 100; i++ {
-			_, err := defaultCostUtils.HashPassword("senhaTeste")
-			assert.NoError(t, err, "Falha na iteração %d", i)
+			_, err := defaultCostUtils.HashPassword("testPassword")
+			assert.NoError(t, err, "failed on iteration %d", i)
 		}
 	})
 }

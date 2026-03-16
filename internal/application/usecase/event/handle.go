@@ -1,20 +1,29 @@
 package event
 
 import (
+	"context"
+	"encoding/json"
+
 	"poc-event-source/internal/application/dto"
-	"poc-event-source/internal/infrastructure/model"
+	"poc-event-source/internal/domain"
 )
 
-func (m *mainHandlerUseCase) Handler(event dto.EventReqDTO) error {
-	modelEv := &model.EventSource{
-		Payload: event.Payload,
+func (m *mainHandlerUseCase) Handler(ctx context.Context, topic string, event dto.EventReqDTO) error {
+	_, err := m.createEventRepo.CreateEvent(ctx, &domain.EventSource{
 		Type:    event.Type,
-	}
-
-	_, err := m.createEventRepo.CreateEvent(modelEv)
+		Payload: event.Payload,
+	})
 	if err != nil {
 		return err
 	}
 
-	return nil
+	envelope, err := json.Marshal(dto.EventMessage{
+		Type:    event.Type,
+		Payload: json.RawMessage(event.Payload),
+	})
+	if err != nil {
+		return err
+	}
+
+	return m.broker.Publish(ctx, topic, envelope)
 }
