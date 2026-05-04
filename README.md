@@ -70,3 +70,4 @@ curl -X POST http://localhost:8080/api/v1/user \
   -d '{"username": "alice", "password": "secret"}'
 # Response: 201 {"status": "event published"}
 ```
+
